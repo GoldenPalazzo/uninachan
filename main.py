@@ -75,7 +75,11 @@ async def create_board(body: Board):
 
 @app.get("/")
 async def root():
+    try:
+        boards = get_boards()
+    except:
+        boards = []
     return {
         "message": "Hello World",
-        'boards': get_boards()
+        'boards': boards
     }
