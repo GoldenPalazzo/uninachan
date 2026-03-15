@@ -1,13 +1,27 @@
+from contextlib import asynccontextmanager
 from datetime import datetime
+from pathlib import Path
 import re
+import os
 
 from fastapi import FastAPI, HTTPException
+from loguru import logger
 from pydantic import BaseModel, field_validator
 import psycopg
 from psycopg.rows import class_row
 
-DATABASE_URL = "postgresql://postgres:example@localhost:5432/postgres"
-app = FastAPI()
+DATABASE_URL = os.environ.get('DATABASE_URL', "postgresql://uninachan:secret@localhost:5432/uninachan")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    schema = Path('./schema.sql').read_text()
+    async with await psycopg.AsyncConnection.connect(DATABASE_URL) as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(schema) # type: ignore
+            await conn.commit()
+            logger.info('Schema initialized')
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 class PostFile(BaseModel):
     id: int
@@ -83,3 +97,4 @@ async def root():
         "message": "Hello World",
         'boards': boards
     }
+
