@@ -9,7 +9,7 @@ from loguru import logger
 import psycopg
 from psycopg.rows import class_row
 
-from models import Board, Thread
+from models import Board, Thread, BoardCreate, ThreadCreate
 
 DATABASE_URL = os.environ.get('DATABASE_URL', "postgresql://uninachan:secret@localhost:5432/uninachan")
 @asynccontextmanager
@@ -19,7 +19,6 @@ async def lifespan(app: FastAPI):
         async with conn.cursor() as cur:
             await cur.execute(schema) # type: ignore
             await conn.commit()
-            logger.info('Schema initialized')
     yield
 
 app = FastAPI(lifespan=lifespan)
@@ -31,7 +30,7 @@ async def get_boards() -> list[Board]:
             return await cur.fetchall()
 
 @app.post("/new/board", response_model=Board, status_code=201)
-async def create_board(body: Board):
+async def create_board(body: BoardCreate):
     async with await psycopg.AsyncConnection.connect(DATABASE_URL) as conn:
         async with conn.cursor(row_factory=class_row(Board)) as cur:
             try:
@@ -43,7 +42,22 @@ async def create_board(body: Board):
                 await conn.commit()
                 return await cur.fetchone()
             except psycopg.errors.UniqueViolation:
-                raise HTTPException(status_code=409, detail=f"Board /{body.slug}/ esiste già")
+                raise HTTPException(status_code=409, detail=f"Board {body.slug} esiste già")
+
+@app.post("/new/thread", response_model=Thread, status_code=201)
+async def create_thread(thread: ThreadCreate):
+    async with await psycopg.AsyncConnection.connect(DATABASE_URL) as conn:
+        async with conn.cursor(row_factory=class_row(Thread)) as cur:
+            try:
+                await cur.execute('''
+                    INSERT INTO threads (board_id, subject)
+                    VALUES (%(board_id)s, %(subject)s)
+                    RETURNING *
+                ''', thread.model_dump())
+                await conn.commit()
+                return await cur.fetchone()
+            except psycopg.errors.ForeignKeyViolation:
+                raise HTTPException(status_code=409, detail=f"La board {thread.board_id} non esiste")
 
 @app.get("/board/{slug}")
 async def get_board(slug: str):
@@ -51,7 +65,6 @@ async def get_board(slug: str):
         async with conn.cursor(row_factory=class_row(Board)) as cur:
             await cur.execute('SELECT * FROM boards WHERE slug=%s', (slug,))
             board = await cur.fetchone()
-            logger.info(board)
             if not board:
                 raise HTTPException(404)
         async with conn.cursor(row_factory=class_row(Thread)) as cur:
@@ -64,6 +77,10 @@ async def get_board(slug: str):
             'board': board,
             'threads': threads
         }
+
+@app.get('/board/{slug}/{thread_id}')
+async def get_thread(slug: str, thread_id: int):
+    pass
 
 @app.get("/")
 async def root():

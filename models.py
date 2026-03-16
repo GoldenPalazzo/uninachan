@@ -20,10 +20,15 @@ class Post(BaseModel):
     files: list[PostFile] = []
     created_at: datetime
 
-class Thread(BaseModel):
-    id: int
+class ThreadBase(BaseModel):
     board_id: int
     subject: str | None
+
+class ThreadCreate(ThreadBase):
+    pass
+
+class Thread(ThreadBase):
+    id: int
     locked: bool
     pinned: bool
     bump_at: datetime
@@ -31,8 +36,7 @@ class Thread(BaseModel):
     op: Post | None = None
     last_replies: list[Post] = []
 
-class Board(BaseModel):
-    id: int
+class BoardBase(BaseModel):
     name: str
     description: str | None = None
     nsfw: bool = False
@@ -47,4 +51,9 @@ class Board(BaseModel):
             raise ValueError("slug deve essere alfanumerico, max 8 caratteri")
         return v
 
+class BoardCreate(BoardBase):
+    pass
 
+class Board(BoardBase):
+    id: int
+   
