@@ -136,7 +136,7 @@ async def create_thread(request: Request, slug: str, thread: ThreadCreate) -> Th
             new_thread.op = new_post
             return new_thread
         except psycopg.errors.ForeignKeyViolation:
-            raise HTTPException(status_code=409, detail=f"La board /{slug}/ non esiste")
+            raise HTTPException(status_code=404, detail=f"La board /{slug}/ non esiste")
 
 @app.delete('/board/{slug}/{thread_id}')
 async def delete_thread(slug: str, thread_id: int):
@@ -155,25 +155,25 @@ async def delete_thread(slug: str, thread_id: int):
 async def create_post(request: Request, slug: str, thread_id: int, post: PostCreate):
     ip_hash = get_ip_hash(request)
     async with await psycopg.AsyncConnection.connect(DATABASE_URL) as conn:
-        # try:
-        board = await get_board_from_slug(conn, slug)
-        async with conn.cursor(row_factory=class_row(Post)) as cur:
-            post.tripcode = generate_tripcode(post.tripcode)
-            await cur.execute('''
-                INSERT INTO posts (thread_id, board_id, name, tripcode, content, ip_hash, is_op)
-                VALUES (%(thread_id)s, %(board_id)s, %(name)s, %(tripcode)s, %(content)s, %(ip_hash)s, false)
-                RETURNING *
-            ''', {
-                **post.model_dump(),
-                'board_id': board.id,
-                'thread_id': thread_id,
-                'ip_hash': ip_hash
-            })
-            new_post = await cur.fetchone()
-        await conn.commit()
-        return new_post
-        # except psycopg.errors.ForeignKeyViolation:
-        #     raise HTTPException(status_code=409, detail=f"La board {thread.board_id} non esiste")
+        try:
+            board = await get_board_from_slug(conn, slug)
+            async with conn.cursor(row_factory=class_row(Post)) as cur:
+                post.tripcode = generate_tripcode(post.tripcode)
+                await cur.execute('''
+                    INSERT INTO posts (thread_id, board_id, name, tripcode, content, ip_hash, is_op)
+                    VALUES (%(thread_id)s, %(board_id)s, %(name)s, %(tripcode)s, %(content)s, %(ip_hash)s, false)
+                    RETURNING *
+                ''', {
+                    **post.model_dump(),
+                    'board_id': board.id,
+                    'thread_id': thread_id,
+                    'ip_hash': ip_hash
+                })
+                new_post = await cur.fetchone()
+            await conn.commit()
+            return new_post
+        except psycopg.errors.ForeignKeyViolation:
+            raise HTTPException(status_code=404, detail=f"Il thread /{slug}/{thread_id} non esiste")
 
 @app.delete('/board/{slug}/{thread_id}/{post_id}')
 async def delete_post(slug: str, thread_id: int, post_id: int, removal: Removal):
@@ -189,8 +189,6 @@ async def delete_post(slug: str, thread_id: int, post_id: int, removal: Removal)
             if cur.rowcount == 0:
                 raise HTTPException(404)
         await conn.commit()
-
-
 
 @app.get("/")
 async def root():
