@@ -21,6 +21,10 @@ def generate_tripcode(password: str | None) -> str | None:
     digest = hashlib.sha1(password.encode()).digest()
     return '!' + base64.b64encode(digest).decode()[:10]
 
+def get_ip_hash(request: Request):
+    host = request.client.host if request.client else 'unknown'
+    return hashlib.sha256(host.encode()).hexdigest()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     schema = Path('./schema.sql').read_text()
@@ -100,7 +104,7 @@ async def get_thread(slug: str, thread_id: int):
 
 @app.post("/board/{slug}", response_model=Thread, status_code=201)
 async def create_thread(request: Request, slug: str, thread: ThreadCreate) -> Thread:
-    ip_hash = hashlib.sha256(request.client.host.encode()).hexdigest()
+    ip_hash = get_ip_hash(request)
     async with await psycopg.AsyncConnection.connect(DATABASE_URL) as conn:
         try:
             board = await get_board_from_slug(conn, slug)
@@ -149,7 +153,7 @@ async def delete_thread(slug: str, thread_id: int):
 
 @app.post("/board/{slug}/{thread_id}", response_model=Post, status_code=201)
 async def create_post(request: Request, slug: str, thread_id: int, post: PostCreate):
-    ip_hash = hashlib.sha256(request.client.host.encode()).hexdigest()
+    ip_hash = get_ip_hash(request)
     async with await psycopg.AsyncConnection.connect(DATABASE_URL) as conn:
         # try:
         board = await get_board_from_slug(conn, slug)
