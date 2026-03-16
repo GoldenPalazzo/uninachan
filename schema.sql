@@ -28,7 +28,9 @@ CREATE TABLE IF NOT EXISTS posts (
     content     TEXT,
     ip_hash     VARCHAR(64) NOT NULL,
     is_op       BOOLEAN DEFAULT false,
-    created_at  TIMESTAMPTZ DEFAULT NOW()
+    created_at  TIMESTAMPTZ DEFAULT NOW(),
+    removed_at  TIMESTAMPTZ DEFAULT NULL,
+    removal_reason TEXT DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS post_files (
