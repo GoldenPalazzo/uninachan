@@ -1,3 +1,4 @@
+import base64
 from contextlib import asynccontextmanager
 from datetime import datetime
 import hashlib
@@ -13,6 +14,13 @@ from psycopg.rows import class_row
 from models import Board, Post, Thread, BoardCreate, PostCreate, ThreadCreate
 
 DATABASE_URL = os.environ.get('DATABASE_URL', "postgresql://uninachan:secret@localhost:5432/uninachan")
+
+def generate_tripcode(password: str | None) -> str | None:
+    if password is None:
+        return None
+    digest = hashlib.sha1(password.encode()).digest()
+    return '!' + base64.b64encode(digest).decode()[:10]
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     schema = Path('./schema.sql').read_text()
@@ -59,6 +67,7 @@ async def create_thread(request: Request, thread: ThreadCreate) -> Thread:
                 new_thread = await cur.fetchone()
                 assert(new_thread is not None)
             async with conn.cursor(row_factory=class_row(Post)) as cur:
+                thread.first_post.tripcode = generate_tripcode(thread.first_post.tripcode)
                 await cur.execute('''
                     INSERT INTO posts (thread_id, board_id, name, tripcode, content, ip_hash, is_op)
                     VALUES (%(thread_id)s, %(board_id)s, %(name)s, %(tripcode)s, %(content)s, %(ip_hash)s, true)
@@ -89,6 +98,7 @@ async def create_post(request: Request, post: PostCreate):
             if not board:
                 raise HTTPException(404)
         async with conn.cursor(row_factory=class_row(Post)) as cur:
+            post.tripcode = generate_tripcode(post.tripcode)
             await cur.execute('''
                 INSERT INTO posts (thread_id, board_id, name, tripcode, content, ip_hash, is_op)
                 VALUES (%(thread_id)s, %(board_id)s, %(name)s, %(tripcode)s, %(content)s, %(ip_hash)s, false)
