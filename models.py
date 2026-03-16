@@ -18,6 +18,7 @@ class PostBase(BaseModel):
     # files: list[PostFile] = []
 
 class PostCreate(PostBase):
+    board_slug: str
     thread_id: int
 
 class Post(PostBase):

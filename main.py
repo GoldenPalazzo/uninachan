@@ -10,7 +10,7 @@ from loguru import logger
 import psycopg
 from psycopg.rows import class_row
 
-from models import Board, Post, Thread, BoardCreate, ThreadCreate
+from models import Board, Post, Thread, BoardCreate, PostCreate, ThreadCreate
 
 DATABASE_URL = os.environ.get('DATABASE_URL', "postgresql://uninachan:secret@localhost:5432/uninachan")
 @asynccontextmanager
@@ -75,6 +75,36 @@ async def create_thread(request: Request, thread: ThreadCreate) -> Thread:
             return new_thread
         except psycopg.errors.ForeignKeyViolation:
             raise HTTPException(status_code=409, detail=f"La board {thread.board_id} non esiste")
+
+@app.post("/new/post", response_model=Post, status_code=201)
+async def create_post(request: Request, post: PostCreate):
+    ip_hash = hashlib.sha256(request.client.host.encode()).hexdigest()
+    async with await psycopg.AsyncConnection.connect(DATABASE_URL) as conn:
+        # try:
+        async with conn.cursor(row_factory=class_row(Board)) as cur:
+            await cur.execute('''
+                SELECT * FROM boards WHERE slug=%s
+            ''', (post.board_slug,))
+            board = await cur.fetchone()
+            if not board:
+                raise HTTPException(404)
+        async with conn.cursor(row_factory=class_row(Post)) as cur:
+            await cur.execute('''
+                INSERT INTO posts (thread_id, board_id, name, tripcode, content, ip_hash, is_op)
+                VALUES (%(thread_id)s, %(board_id)s, %(name)s, %(tripcode)s, %(content)s, %(ip_hash)s, false)
+                RETURNING *
+            ''', {
+                **post.model_dump(),
+                'board_id': board.id,
+                'ip_hash': ip_hash
+            })
+            new_post = await cur.fetchone()
+            await conn.commit()
+        return new_post
+        # except psycopg.errors.ForeignKeyViolation:
+        #     raise HTTPException(status_code=409, detail=f"La board {thread.board_id} non esiste")
+
+
 
 @app.get("/board/{slug}")
 async def get_board(slug: str):
