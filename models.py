@@ -11,21 +11,27 @@ class PostFile(BaseModel):
     height: int | None
     spoiler: bool
 
-class Post(BaseModel):
-    id: int
-    thread_id: int
+class PostBase(BaseModel):
     name: str
-    tripcode: str | None
-    content: str | None
-    files: list[PostFile] = []
+    tripcode: str | None = None
+    content: str | None = None
+    # files: list[PostFile] = []
+
+class PostCreate(PostBase):
+    thread_id: int
+
+class Post(PostBase):
+    thread_id: int
+    id: int
     created_at: datetime
+    is_op: bool
 
 class ThreadBase(BaseModel):
     board_id: int
     subject: str | None
 
 class ThreadCreate(ThreadBase):
-    pass
+    first_post: PostBase
 
 class Thread(ThreadBase):
     id: int
