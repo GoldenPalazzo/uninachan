@@ -24,6 +24,32 @@ Il `Dockerfile` dovrebbe essere sufficiente per poter essere integrato in file
 Altrimenti se si decide di lanciare tutto a mano o comunque setuppare il repo
 per sviluppo, seguire le istruzioni sotto.
 
+#### Sample `compose.yml`
+
+```yml
+services:
+  api:
+    build: ./backend
+    ports:
+      - 8000:8000
+    env_file:
+      - path: ./api.env
+        required: true
+    depends_on:
+      - db
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    shm_size: 128mb
+    ports:
+      - 5432:5432
+    env_file:
+      - path: ./postgres.env
+        required: true
+```
+
+dove `./backend` è la cartella dove risiede questo repo.
+
 ### Setup python
 
 È necessario `uv` per poter usare questo progetto.
@@ -47,4 +73,11 @@ che si deve creare un server postgresql la cui url è salvata nella variabile
 $ uv run fastapi run main.py
 ```
 
+## Licenza
+
+Questo software è distribuito secondo licenza MIT, permettendo uso
+commerciale, redistribuzione, modifica ed uso privato.
+
 ## Collaborazioni
+
+Qualsiasi pr e fork sono ben accetti.
